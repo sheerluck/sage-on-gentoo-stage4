@@ -1,0 +1,36 @@
+FROM gentoo/portage:20200601 as portage
+FROM gentoo/stage3-amd64:20200601
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ENV LANG=C.UTF-8
+RUN    echo 'PYTHON_TARGETS="python3_7"' >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_7"' >> /etc/portage/make.conf \
+    && echo 'FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"' >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection"' >> /etc/portage/make.conf \
+    && emerge app-portage/layman \
+    && layman -Lk \
+    && yes | layman -a sage-on-gentoo \
+    && mkdir /etc/portage/package.{accept_keywords,unmask} \
+    && mkdir /etc/portage/profile \
+    && ln -s /var/lib/layman/sage-on-gentoo/package.unmask/sage /etc/portage/package.unmask/sage \
+    && ln -s /var/lib/layman/sage-on-gentoo/package.keywords/sage /etc/portage/package.accept_keywords/sage \
+    && ln -s /var/lib/layman/sage-on-gentoo/package.use/sage /etc/portage/package.use/sage \
+    && ln -s /var/lib/layman/sage-on-gentoo/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'media-gfx/tachyon-0.99_beta6-r2' >> /etc/portage/profile/package.provided \
+    && echo 'media-libs/harfbuzz icu' >> /etc/portage/package.use/zzz \
+    && echo 'dev-python/pandas ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && emerge -o sage  # Only merge the dependencies, not the sage.
+
+# additional steps that were discovered after `tox -e docker-gentoo-standard`
+RUN    echo 'sci-libs/openblas ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && emerge -C sage net-misc/openssh dev-lang/python:2.7 \
+    && rm /etc/portage/profile/package.provided \
+    && echo 'sci-libs/m4ri png' >> /etc/portage/package.use/zzz \
+    && echo 'media-gfx/tachyon -png -opengl' >> /etc/portage/package.use/zzz
+
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker build -t sheerluck/sage-on-gentoo-stage4:20.6 -t sheerluck/sage-on-gentoo-stage4:latest -f Dockerfile_gentoo-20.06-gcc9-py37 .
