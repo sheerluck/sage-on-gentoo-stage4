@@ -37,11 +37,19 @@ RUN    echo 'sci-libs/openblas ~amd64' >>          /etc/portage/package.accept_k
     && emerge -C python:3.8 \
     && echo 'dev-lang/python-3.8.2-r2' >>          /etc/portage/profile/package.provided
 
+# additional steps for gentoo.txt and sage-print-system-package-command 
+RUN    echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'dev-perl/* ~amd64' >>                 /etc/portage/package.accept_keywords/zzz \
+    && emerge libcroco guile bc gp2c isl \
+    && emerge XML-Writer XML-LibXML XML-LibXSLT File-Slurp \
+    && emerge Term-ReadLine-Gnu JSON SVG \
+    && emerge dev-perl/MongoDB # actually https://bugs.gentoo.org/728556 so 2.2.1
+ 
 # cleanup
 RUN    eselect news read \
     && rm -frv /var/cache/distfiles/* \
     && rm -frv /usr/share/gap/doc/* \
-    && rm -frv /usr/share/texmf-dist/fonts/* \
     && rm -frv /usr/share/doc/* \
     && rm -frv /usr/share/man/*
 
