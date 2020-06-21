@@ -43,7 +43,7 @@ RUN    echo 'sci-libs/openblas ~amd64' >>          /etc/portage/package.accept_k
 RUN    echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
     && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
     && emerge libcroco guile bc gp2c isl \
-    && emerge coinor-cbc libsemigroups \
+    && emerge coinor-cbc libsemigroups yasm \
     && emerge XML-Writer XML-LibXML XML-LibXSLT File-Slurp \
     && emerge Term-ReadLine-Gnu JSON SVG \
     && emerge Unicode-LineBreak App-pwhich dev-perl/MongoDB
