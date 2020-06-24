@@ -27,16 +27,15 @@ RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
     && echo 'dev-lang/R        ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-perl/*        ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
     && emerge -o sage \
-    && emerge -C sage \
-    && rm /etc/portage/profile/package.provided
+    && emerge -C sage 
 
 # additional steps that were discovered after `tox -e docker-gentoo-standard`
 RUN    echo 'sci-libs/openblas ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-libs/m4ri png' >>                 /etc/portage/package.use/zzz \
-    && echo 'media-gfx/tachyon -png -opengl' >>    /etc/portage/package.use/zzz \
     && emerge sys-libs/pam certifi python:3.8 setuptools \
-    && emerge libxslt libxml2 openssl arb openblas m4ri libpcre tachyon \
+    && emerge libxslt libxml2 openssl arb openblas m4ri libpcre \
     && emerge -C python:3.8 \
+    && echo 'app-text/pandoc-1.19.2.1-r1' >>       /etc/portage/profile/package.provided \
     && echo 'dev-lang/python-3.8.2-r2' >>          /etc/portage/profile/package.provided
 
 # additional steps for gentoo.txt and sage-print-system-package-command 
