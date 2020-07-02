@@ -1,0 +1,80 @@
+FROM gentoo/portage:20200701 as portage
+FROM gentoo/stage3-amd64:20200701
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/lib/layman/sage-on-gentoo"
+ARG ELLIPTIC_CURVES="sci-mathematics/sage-data-elliptic_curves-0.8"
+
+ENV LANG=C.UTF-8
+RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_7"'  >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection"'       >> /etc/portage/make.conf \
+    && emerge -C net-misc/openssh dev-lang/python:2.7 \
+    && emerge app-portage/layman \
+    && layman -Lk \
+    && yes | layman -a sage-on-gentoo \
+    && mkdir /etc/portage/package.{accept_keywords,unmask,mask} \
+    && mkdir /etc/portage/profile \
+    && ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/sage \
+    && ln -s ${OVERLAY}/package.keywords/sage      /etc/portage/package.accept_keywords/sage \
+    && ln -s ${OVERLAY}/package.use/sage           /etc/portage/package.use/sage \
+    && ln -s ${OVERLAY}/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'media-gfx/tachyon-0.99_beta6-r2' >>   /etc/portage/profile/package.provided \
+    && echo ${ELLIPTIC_CURVES} >>                  /etc/portage/profile/package.provided \
+    && echo 'app-text/pandoc-1.19.2.1-r1' >>       /etc/portage/profile/package.provided \
+    && echo 'media-libs/harfbuzz icu'  >>          /etc/portage/package.use/zzz \
+    && echo 'dev-lang/python sqlite' >>            /etc/portage/package.use/zzz \
+    && echo '>dev-python/cython-0.29.19' >>        /etc/portage/package.mask/zzz \
+    && echo 'dev-python/pandas ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/R        ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*        ~amd64' >>          /etc/portage/package.accept_keywords/zzz
+
+# ModuleNotFoundError: No module named 'sqlite3'
+RUN    emerge python:3.7 \
+    && emerge -o sage \
+    && emerge -C python:3.8 \
+    && echo 'dev-lang/python-3.8.2-r2' >>          /etc/portage/profile/package.provided
+
+# additional steps that were discovered after `tox -e docker-gentoo-standard`
+RUN    echo 'sci-libs/m4ri png' >>                 /etc/portage/package.use/zzz \
+    && emerge sys-libs/pam certifi setuptools \
+    && emerge libcroco guile bc Unicode-LineBreak \
+    && emerge libxslt libxml2 openssl arb openblas m4ri libpcre
+
+# additional steps for gentoo.txt and sage-print-system-package-command 
+RUN    echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
+    && emerge gp2c isl coinor-cbc libsemigroups yasm \
+    && emerge XML-Writer XML-LibXML XML-LibXSLT File-Slurp \
+    && emerge Term-ReadLine-Gnu JSON SVG dev-perl/MongoDB
+
+# cheating
+ARG PANDOC="https://github.com/jgm/pandoc"
+ARG VER="2.10"
+RUN    wget ${PANDOC}/releases/download/${VER}/pandoc-${VER}-linux-amd64.tar.gz \
+    && tar xvzf pandoc-${VER}-linux-amd64.tar.gz -C /tmp \
+       pandoc-${VER}/bin/pandoc \
+       pandoc-${VER}/bin/pandoc-citeproc \
+    && mv /tmp/pandoc-${VER}/bin/* /usr/bin/ \
+    && rm -frv pandoc-${VER}-linux-amd64.tar.gz \
+    && rm -frv /tmp/pandoc-${VER}
+
+# cleanup
+RUN    eselect news read \
+    && rm -frv /var/cache/distfiles/* \
+    && rm -frv /usr/share/gap/doc/* \
+    && mv /usr/share/doc/pari-* /tmp \
+    && rm -frv /usr/share/doc/* \
+    && mv /tmp/pari-* /usr/share/doc \
+    && rm -frv /usr/share/man/* \
+    && emerge -C sage
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker build -t sheerluck/sage-on-gentoo-stage4:20.7   \
+#              -t sheerluck/sage-on-gentoo-stage4:latest \
+#              -f Dockerfile_gentoo-20.07-gcc9-py37 .
