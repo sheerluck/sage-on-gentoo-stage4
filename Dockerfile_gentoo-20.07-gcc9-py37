@@ -25,12 +25,17 @@ RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
     && echo 'media-gfx/tachyon-0.99_beta6-r2' >>   /etc/portage/profile/package.provided \
     && echo ${ELLIPTIC_CURVES} >>                  /etc/portage/profile/package.provided \
     && echo 'app-text/pandoc-1.19.2.1-r1' >>       /etc/portage/profile/package.provided \
-    && echo 'media-libs/harfbuzz icu'  >>          /etc/portage/package.use/zzz \
-    && echo 'dev-lang/python sqlite' >>            /etc/portage/package.use/zzz \
-    && echo '>dev-python/cython-0.29.19' >>        /etc/portage/package.mask/zzz \
-    && echo 'dev-python/pandas ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
-    && echo 'dev-lang/R        ~amd64' >>          /etc/portage/package.accept_keywords/zzz \
-    && echo 'dev-perl/*        ~amd64' >>          /etc/portage/package.accept_keywords/zzz
+    && echo 'dev-lang/python        sqlite' >>     /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'media-libs/harfbuzz    icu' >>        /etc/portage/package.use/zzz \
+    && echo 'sci-libs/brial         png' >>        /etc/portage/package.use/zzz \
+    && echo 'sci-libs/m4ri          png' >>        /etc/portage/package.use/zzz \
+    && echo '>dev-python/cython-0.29.19'  >>       /etc/portage/package.mask/zzz \
+    && echo '>sci-mathematics/arb-2.16.9' >>       /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/R          ~amd64' >>        /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*          ~amd64' >>        /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pandas   ~amd64' >>        /etc/portage/package.accept_keywords/zzz
 
 # ModuleNotFoundError: No module named 'sqlite3'
 RUN    emerge python:3.7 \
@@ -39,17 +44,12 @@ RUN    emerge python:3.7 \
     && echo 'dev-lang/python-3.8.2-r2' >>          /etc/portage/profile/package.provided
 
 # additional steps that were discovered after `tox -e docker-gentoo-standard`
-RUN    echo 'sci-libs/m4ri png' >>                 /etc/portage/package.use/zzz \
-    && emerge sys-libs/pam certifi setuptools \
-    && emerge libcroco guile bc Unicode-LineBreak \
-    && emerge libxslt libxml2 openssl arb openblas m4ri libpcre
+RUN    emerge sys-libs/pam certifi setuptools libcroco guile bc \
+    Unicode-LineBreak libxslt libxml2 openssl openblas libpcre
 
 # additional steps for gentoo.txt and sage-print-system-package-command 
-RUN    echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
-    && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
-    && emerge gp2c isl coinor-cbc libsemigroups yasm \
-    && emerge XML-Writer XML-LibXML XML-LibXSLT File-Slurp \
-    && emerge Term-ReadLine-Gnu JSON SVG dev-perl/MongoDB
+RUN    emerge gp2c isl coinor-cbc libsemigroups yasm XML-Writer \
+    XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG dev-perl/MongoDB
 
 # cheating
 ARG PANDOC="https://github.com/jgm/pandoc"
