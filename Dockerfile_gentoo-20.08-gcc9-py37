@@ -1,0 +1,98 @@
+FROM gentoo/portage:20200801 as portage
+FROM gentoo/stage3-amd64:20200801
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/lib/layman/sage-on-gentoo"
+
+ENV LANG=C.UTF-8
+
+# mkdir
+RUN    mkdir /etc/portage/profile \
+    && mkdir /etc/portage/package.{accept_keywords,unmask,mask}
+
+# layman
+RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_7"'  >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection"'       >> /etc/portage/make.conf \
+    && emerge -C net-misc/openssh dev-lang/python:2.7 \
+    && emerge app-portage/layman \
+    && layman -Lk \
+    && yes | layman -a sage-on-gentoo 
+
+# USE + ~amd64
+RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/sage \
+    && ln -s ${OVERLAY}/package.keywords/sage      /etc/portage/package.accept_keywords/sage \
+    && ln -s ${OVERLAY}/package.use/sage           /etc/portage/package.use/sage \
+    && ln -s ${OVERLAY}/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'media-gfx/tachyon-0.99_beta6-r2' >>   /etc/portage/profile/package.provided \
+    && echo 'app-text/pandoc-1.19.2.1-r1' >>       /etc/portage/profile/package.provided \
+    && echo 'dev-lang/python        sqlite' >>     /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny-XS  minimal' >>    /etc/portage/package.use/zzz \
+    && echo 'media-libs/harfbuzz    icu' >>        /etc/portage/package.use/zzz \
+    && echo 'sci-libs/brial         png' >>        /etc/portage/package.use/zzz \
+    && echo 'sci-libs/m4ri          png' >>        /etc/portage/package.use/zzz \
+    && echo 'app-misc/rlwrap       ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/R            ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*            ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pandas     ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/arpack       ~amd64' >>      /etc/portage/package.accept_keywords/zzz
+
+# https://trac.sagemath.org/ticket/29766  
+RUN    echo 'dev-python/matplotlib ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/numpy      ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pybind11   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pybind11   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/scipy        ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/arb   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/flint ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo '>dev-python/pandas-1.0.9'     >>      /etc/portage/package.mask/zzz \
+    && echo '>sys-libs/gdbm-1.14'          >>      /etc/portage/package.mask/zzz
+
+# ModuleNotFoundError: No module named 'sqlite3'
+RUN    emerge python:3.7 \
+    && emerge -o sage \
+    && emerge -C python:3.8 \
+    && echo 'dev-lang/python-3.8.4-r1' >>          /etc/portage/profile/package.provided
+
+# additional steps that were discovered after `tox -e docker-gentoo-standard`
+RUN    emerge pam pambase certifi setuptools libcroco guile bc \
+    Unicode-LineBreak libxslt libxml2 openssl openblas libpcre \
+    desktop-file-utils flint eclib arb gemato rsync bc libpcre \
+    binutils-config gcc-config
+
+# additional steps for gentoo.txt and sage-print-system-package-command 
+RUN    echo 'sci-mathematics/gp2c ~amd64' >>       /etc/portage/package.accept_keywords/zzz \
+    && emerge gp2c isl coinor-cbc libsemigroups yasm XML-Writer \
+    XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG dev-perl/MongoDB
+
+# cheating
+ARG PANDOC="https://github.com/jgm/pandoc"
+ARG VER="2.10.1"
+RUN    wget ${PANDOC}/releases/download/${VER}/pandoc-${VER}-linux-amd64.tar.gz \
+    && tar xvzf pandoc-${VER}-linux-amd64.tar.gz -C /tmp \
+       pandoc-${VER}/bin/pandoc \
+       pandoc-${VER}/bin/pandoc-citeproc \
+    && mv /tmp/pandoc-${VER}/bin/* /usr/bin/ \
+    && rm -frv pandoc-${VER}-linux-amd64.tar.gz \
+    && rm -frv /tmp/pandoc-${VER}
+
+# cleanup
+RUN    eselect news read \
+    && rm -frv /var/cache/distfiles/* \
+    && rm -frv /usr/share/gap/doc/* \
+    && mv /usr/share/doc/pari-* /tmp \
+    && rm -frv /usr/share/doc/* \
+    && mv /tmp/pari-* /usr/share/doc \
+    && rm -frv /usr/share/man/* \
+    && emerge -C sage
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker build -t sheerluck/sage-on-gentoo-stage4:20.8   \
+#              -t sheerluck/sage-on-gentoo-stage4:latest \
+#              -f Dockerfile_gentoo-20.08-gcc9-py37 .
