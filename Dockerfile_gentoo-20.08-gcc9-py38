@@ -1,5 +1,5 @@
-FROM gentoo/portage:20200801 as portage
-FROM gentoo/stage3-amd64:20200801
+FROM gentoo/portage:20200804 as portage
+FROM gentoo/stage3-amd64:20200804
 # copy the entire portage volume in
 COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
 
@@ -13,11 +13,12 @@ RUN    mkdir /etc/portage/profile \
     && mkdir /etc/portage/package.{accept_keywords,unmask,mask}
 
 # layman
-RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
-    && echo 'PYTHON_SINGLE_TARGET="python3_7"'  >> /etc/portage/make.conf \
+RUN    echo 'PYTHON_TARGETS="python3_8"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_8"'  >> /etc/portage/make.conf \
     && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
     && echo 'USE="${USE} -introspection"'       >> /etc/portage/make.conf \
-    && emerge -C net-misc/openssh dev-lang/python:2.7 \
+    && emerge -DNu --with-bdeps=y --complete-graph=y @system @world       \
+    && emerge -C net-misc/openssh dev-lang/python:2.7 dev-lang/python:3.7 \
     && emerge app-portage/layman \
     && layman -Lk \
     && yes | layman -a sage-on-gentoo 
@@ -27,6 +28,8 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && ln -s ${OVERLAY}/package.keywords/sage      /etc/portage/package.accept_keywords/sage \
     && ln -s ${OVERLAY}/package.use/sage           /etc/portage/package.use/sage \
     && ln -s ${OVERLAY}/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'sci-mathematics/sage' >>              /etc/portage/package.unmask/zzz \
+    && echo 'dev-python/rpy' >>                    /etc/portage/package.unmask/zzz \
     && echo 'media-gfx/tachyon-0.99_beta6-r2' >>   /etc/portage/profile/package.provided \
     && echo 'app-text/pandoc-1.19.2.1-r1' >>       /etc/portage/profile/package.provided \
     && echo 'dev-lang/python        sqlite' >>     /etc/portage/package.use/zzz \
@@ -35,6 +38,9 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && echo 'media-libs/harfbuzz    icu' >>        /etc/portage/package.use/zzz \
     && echo 'sci-libs/brial         png' >>        /etc/portage/package.use/zzz \
     && echo 'sci-libs/m4ri          png' >>        /etc/portage/package.use/zzz \
+    && echo 'sci-mathematics/sage  **'     >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/rpy        **'     >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/python       ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'app-misc/rlwrap       ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-lang/R            ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-perl/*            ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
@@ -45,18 +51,22 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
 RUN    echo 'dev-python/matplotlib ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-python/numpy      ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-python/pybind11   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
-    && echo 'dev-python/pybind11   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-libs/scipy        ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-mathematics/arb   ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-mathematics/flint ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
-    && echo '>dev-python/pandas-1.0.9'     >>      /etc/portage/package.mask/zzz \
-    && echo '>sys-libs/gdbm-1.14'          >>      /etc/portage/package.mask/zzz
+    && echo 'media-gfx/threejs-sage-extension ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/sphinx     ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/sympy      ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/glib         ~amd64' >>      /etc/portage/package.accept_keywords/zzz \
+    && echo '<dev-lang/python-3.8.5'       >>      /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.9'          >>      /etc/portage/package.mask/zzz
+
 
 # ModuleNotFoundError: No module named 'sqlite3'
-RUN    emerge python:3.7 \
-    && emerge -o sage \
-    && emerge -C python:3.8 \
-    && echo 'dev-lang/python-3.8.4-r1' >>          /etc/portage/profile/package.provided
+RUN    emerge python:3.8 \
+    && emerge -o =sci-mathematics/sage-9999
+
+
 
 # additional steps that were discovered after `tox -e docker-gentoo-standard`
 RUN    emerge pam pambase certifi setuptools libcroco guile bc \
@@ -93,6 +103,6 @@ RUN    eselect news read \
 WORKDIR /
 CMD ["/bin/bash"]
 
-# docker build -t sheerluck/sage-on-gentoo-stage4:20.8-py37   \
-#              -t sheerluck/sage-on-gentoo-stage4:latest-py37 \
-#              -f Dockerfile_gentoo-20.08-gcc9-py37 .
+# docker build -t sheerluck/sage-on-gentoo-stage4:20.8   \
+#              -t sheerluck/sage-on-gentoo-stage4:latest \
+#              -f Dockerfile_gentoo-20.08-gcc9-py38 .
