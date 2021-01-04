@@ -1,0 +1,124 @@
+FROM gentoo/portage:20210102 as portage
+FROM gentoo/stage3:20210102
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/db/repos/sage-on-gentoo"
+
+ENV LANG=C.UTF-8
+
+# mkdir
+RUN    mkdir /etc/portage/profile \
+    && mkdir /etc/portage/package.{accept_keywords,unmask}
+
+# layman
+RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_7"'  >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection"'       >> /etc/portage/make.conf
+
+RUN    emerge python:3.7
+RUN    echo 'dev-python/setuptools       python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
+    && echo 'dev-python/certifi          python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
+    && echo 'dev-python/setuptools_scm   python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
+    && emerge portage \
+    && emerge -DNu --with-bdeps=y --complete-graph=y @system @world 
+
+RUN    rm /etc/portage/package.use/setuptools \
+    && emerge -1 jinja certifi setuptools setuptools_scm
+
+RUN    echo 'app-eselect/eselect-repository ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && emerge app-eselect/eselect-repository dev-vcs/git \
+    && touch /etc/portage/repos.conf \
+    && eselect repository enable sage-on-gentoo \
+    && emaint sync --repo sage-on-gentoo
+
+# USE + ~amd64
+RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/sage \
+    && ln -s ${OVERLAY}/package.keywords/s*-devel  /etc/portage/package.accept_keywords/sage \
+    && ln -s ${OVERLAY}/package.keywords/*4.11.0   /etc/portage/package.accept_keywords/gap  \
+    && ln -s ${OVERLAY}/package.use/sage           /etc/portage/package.use/sage \
+    && ln -s ${OVERLAY}/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'sci-mathematics/sage' >>              /etc/portage/package.unmask/zzz \
+    && echo 'dev-python/rpy' >>                    /etc/portage/package.unmask/zzz \
+    && echo 'media-gfx/tachyon-0.99_beta6-r2' >>   /etc/portage/profile/package.provided \
+    && echo 'app-text/pandoc-1.19.2.1-r1'     >>   /etc/portage/profile/package.provided \
+    && echo 'dev-lang/python        sqlite'   >>   /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal'  >>   /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny-XS  minimal'  >>   /etc/portage/package.use/zzz \
+    && echo 'dev-python/pillow      jpeg'     >>   /etc/portage/package.use/zzz \
+    && echo 'media-libs/harfbuzz    icu'      >>   /etc/portage/package.use/zzz \
+    && echo 'sci-libs/brial         png'      >>   /etc/portage/package.use/zzz \
+    && echo 'sci-libs/m4ri          png'      >>   /etc/portage/package.use/zzz \
+    && echo 'app-misc/rlwrap        ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/R             ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/python        ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/boost         ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/glib          ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*             ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/matplotlib  ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/numpy       ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pandas      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/pybind11    ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/rpy         **'       >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/sphinx      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/sympy       ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-util/boost-build   ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'media-gfx/threejs-sage-extension ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/arpack        ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/libhomfly     ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/scipy         ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/*      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/sage   **'       >>   /etc/portage/package.accept_keywords/zzz \
+    && echo '<dev-lang/python-3.7.9'          >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.8'             >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.9'             >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.10'            >>   /etc/portage/package.mask/zzz
+
+# REMOVE IN 20.12
+RUN    echo '>sci-mathematics/pari-2.12'      >>   /etc/portage/package.mask/zzz
+
+# ModuleNotFoundError: No module named 'sqlite3'
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
+    && emerge -C net-misc/openssh                                    \
+    && emerge -C dev-lang/python:3.8 dev-lang/python:3.9
+
+RUN    emerge dev-tex/hevea
+RUN    emerge -o =sci-mathematics/sage-9999
+
+# additional steps that were discovered after `tox -e docker-gentoo-standard`
+RUN    emerge libcroco guile bc pari openblas desktop-file-utils flint eclib arb
+
+# additional steps for gentoo.txt and sage-print-system-package-command 
+RUN    echo 'sci-mathematics/gp2c ~amd64' >>       /etc/portage/package.accept_keywords/zzz \
+    && emerge gp2c isl coinor-cbc libsemigroups yasm XML-Writer \
+    XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG dev-perl/MongoDB \
+    sci-libs/brial dev-python/tox dev-libs/igraph
+
+# cheating
+ARG PANDOC="https://github.com/jgm/pandoc"
+ARG VER="2.11.3.2"
+RUN    wget ${PANDOC}/releases/download/${VER}/pandoc-${VER}-linux-amd64.tar.gz \
+    && tar xvzf pandoc-${VER}-linux-amd64.tar.gz -C /tmp \
+       pandoc-${VER}/bin/pandoc \
+    && mv /tmp/pandoc-${VER}/bin/* /usr/bin/ \
+    && rm -frv pandoc-${VER}-linux-amd64.tar.gz \
+    && rm -frv /tmp/pandoc-${VER}
+
+# cleanup
+RUN    emerge @preserved-rebuild \
+    && eselect news read \
+    && rm -frv /var/cache/distfiles/* \
+    && rm -frv /usr/share/gap/doc/* \
+    && mv /usr/share/doc/pari-* /tmp \
+    && rm -frv /usr/share/doc/* \
+    && mv /tmp/pari-* /usr/share/doc \
+    && rm -frv /usr/share/man/*
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker build -t sheerluck/sage-on-gentoo-stage4:21.01-py37  \
+#              -t sheerluck/sage-on-gentoo-stage4:latest-py37 \
+#              -f Dockerfile_gentoo-21.01-gcc9-py37 .
