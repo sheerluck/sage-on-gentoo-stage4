@@ -13,20 +13,12 @@ RUN    mkdir /etc/portage/profile \
     && mkdir /etc/portage/package.{accept_keywords,unmask}
 
 # layman
-RUN    echo 'PYTHON_TARGETS="python3_7"'        >> /etc/portage/make.conf \
-    && echo 'PYTHON_SINGLE_TARGET="python3_7"'  >> /etc/portage/make.conf \
+RUN    echo 'PYTHON_TARGETS="python3_9"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_9"'  >> /etc/portage/make.conf \
     && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
     && echo 'USE="${USE} -introspection"'       >> /etc/portage/make.conf
 
-RUN    emerge python:3.7
-RUN    echo 'dev-python/setuptools       python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
-    && echo 'dev-python/certifi          python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
-    && echo 'dev-python/setuptools_scm   python_targets_python3_8'   >>   /etc/portage/package.use/setuptools \
-    && emerge portage \
-    && emerge -DNu --with-bdeps=y --complete-graph=y @system @world 
-
-RUN    rm /etc/portage/package.use/setuptools \
-    && emerge -1 jinja certifi setuptools setuptools_scm
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world
 
 RUN    echo 'app-eselect/eselect-repository ~amd64' >> /etc/portage/package.accept_keywords/zzz \
     && emerge app-eselect/eselect-repository dev-vcs/git \
@@ -72,14 +64,12 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && echo 'sci-mathematics/*      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-mathematics/sage   **'       >>   /etc/portage/package.accept_keywords/zzz \
     && echo '>sci-mathematics/maxima-5.44.0'  >>   /etc/portage/package.mask/zzz \
-    && echo '<dev-lang/python-3.7.9'          >>   /etc/portage/package.mask/zzz \
-    && echo 'dev-lang/python:3.8'             >>   /etc/portage/package.mask/zzz \
-    && echo 'dev-lang/python:3.9'             >>   /etc/portage/package.mask/zzz \
+    && echo '<dev-lang/python-3.9.0'          >>   /etc/portage/package.mask/zzz \
     && echo 'dev-lang/python:3.10'            >>   /etc/portage/package.mask/zzz
 
 # ModuleNotFoundError: No module named 'sqlite3'
 RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
-    && emerge -C net-misc/openssh dev-lang/python:3.8 dev-lang/python:3.9
+    && emerge -C net-misc/openssh dev-lang/python:3.8
 
 
 RUN    emerge dev-tex/hevea
@@ -120,6 +110,6 @@ RUN    emerge @preserved-rebuild \
 WORKDIR /
 CMD ["/bin/bash"]
 
-# docker build -t sheerluck/sage-on-gentoo-stage4:21.04-py37  \
-#              -t sheerluck/sage-on-gentoo-stage4:latest-py37 \
-#              -f Dockerfile_gentoo-21.04-py37 .
+# docker build -t sheerluck/sage-on-gentoo-stage4:21.04-py39  \
+#              -t sheerluck/sage-on-gentoo-stage4:latest-py39 \
+#              -f Dockerfile_gentoo-21.04-py39 .

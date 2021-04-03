@@ -71,8 +71,8 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
 
 # ModuleNotFoundError: No module named 'sqlite3'
 RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
-    && emerge -C net-misc/openssh                                    \
-    && emerge -C dev-lang/python:3.9
+    && emerge -C net-misc/openssh dev-lang/python:3.9
+
 
 RUN    emerge dev-tex/hevea
 RUN    emerge -o =sci-mathematics/sage-9999
