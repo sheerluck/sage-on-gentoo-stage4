@@ -1,0 +1,82 @@
+--- a/DoConfig
++++ b/DoConfig
+@@ -47,6 +47,8 @@
+ 
+ 'TUNE'         => 'generic',
+ 
++'PACKAGE_VERSION'  => undef,
++
+ );
+ 
+ 
+@@ -283,6 +285,12 @@
+    }
+ }
+ 
++# retrieve ntl version from DIRNAME
++open(DIRNAME, "< DIRNAME");
++@versionline = split('-',<DIRNAME>);
++chomp($versionline[1]);
++$MakeVal{'PACKAGE_VERSION'} = $versionline[1];
++close(DIRNAME);
+ 
+ # copy %MakeVal and %MakeFlag as is into %MakeSub
+ 
+@@ -397,6 +405,22 @@
+    close(MFILE);
+    close(MFILEOUT);
+    
++   # generate ntl.pc
++
++   open(NTLPCIN, "< ntl.pc.in");
++   open(NTLPC, "> ntl.pc");
++
++   while ($line = <NTLPCIN>) {
++
++      $line =~ s/@\{(.*?)\}/$MakeSub{$1}/ge;
++      $line =~ tr/()/{}/;
++
++      print NTLPC $line;
++
++   }
++
++   close(NTLPCIN);
++   close(NTLPC);
+    
+    # generate config.h
+    
+--- a/mfile
++++ b/mfile
+@@ -453,7 +453,9 @@
+ @{LSTAT}	cp -p ntl.a $(DESTDIR)$(LIBDIR)/libntl.a #LSTAT
+ @{LSTAT}	- chmod a+r $(DESTDIR)$(LIBDIR)/libntl.a #LSTAT
+ @{LSHAR}	$(LIBTOOL) --mode=install cp -p libntl.la $(DESTDIR)$(LIBDIR) #LSHAR
+-
++	mkdir -p -m 755 $(DESTDIR)$(LIBDIR)/pkgconfig
++	cp -p ntl.pc $(DESTDIR)$(LIBDIR)/pkgconfig/
++	chmod a+r $(DESTDIR)$(LIBDIR)/pkgconfig/ntl.pc
+ 
+ uninstall:
+ @{LSTAT}	rm -f $(LIBDIR)/libntl.a #LSTAT
+--- /dev/null
++++ b/ntl.pc.in
+@@ -0,0 +1,19 @@
++# Define these NTL configuration variables as they may not be 
++# substited by DoConfig
++DEF_PREFIX=@{DEF_PREFIX}
++PREFIX=@{PREFIX}
++# optional dependencies
++@{GF2X}GF2X_PKG=gf2x
++@{GMP}GMP_PKG=gmp
++# Normal pc file starts here
++prefix=@{PREFIX}
++libdir=@{LIBDIR}
++includedir=@{INCLUDEDIR}/NTL
++
++Name: ntl
++URL: http://www.shoup.net/
++Description: A library for doing number theory
++Version: @{PACKAGE_VERSION}
++Libs: -L${libdir} -lntl
++Cflags: -I${includedir} @{CXXAUTOFLAGS}
++Requires.private: ${GF2X_PKG} ${GMP_PKG}
