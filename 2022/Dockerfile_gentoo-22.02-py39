@@ -1,5 +1,5 @@
-FROM gentoo/portage:20220111 as portage
-FROM gentoo/stage3:20220111
+FROM gentoo/portage:20220202 as portage
+FROM gentoo/stage3:20220202
 # copy the entire portage volume in
 COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
 
@@ -21,6 +21,8 @@ COPY   tachyon-0.99_beta6-r3.ebuild /var/db/repos/gentoo/media-gfx/tachyon/tachy
 RUN    ebuild /var/db/repos/gentoo/media-gfx/tachyon/tachyon-0.99_beta6-r3.ebuild digest
 COPY   pdf2svg-0.2.3-r4.ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.2.3-r4.ebuild
 RUN    ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.2.3-r4.ebuild digest
+COPY   sphinx-4.4.0.ebuild /var/db/repos/gentoo/dev-python/sphinx/sphinx-4.4.0.ebuild
+RUN    ebuild /var/db/repos/gentoo/dev-python/sphinx/sphinx-4.4.0.ebuild digest
 
 # layman
 RUN    echo 'PYTHON_TARGETS="python3_9"'        >> /etc/portage/make.conf \
@@ -45,6 +47,7 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && echo 'sci-mathematics/sage' >>              /etc/portage/package.unmask/zzz \
     && echo 'dev-python/rpy' >>                    /etc/portage/package.unmask/zzz \
     && echo 'app-text/pandoc-2.13'            >>   /etc/portage/profile/package.provided \
+    && echo 'www-misc/thebe-20160525'         >>   /etc/portage/profile/package.provided \
     && echo 'app-text/poppler       cairo'    >>   /etc/portage/package.use/zzz \
     && echo 'dev-lang/python        sqlite'   >>   /etc/portage/package.use/zzz \
     && echo 'dev-perl/Type-Tiny     minimal'  >>   /etc/portage/package.use/zzz \
@@ -74,6 +77,7 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && echo 'sci-mathematics/*      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
     && echo 'sci-mathematics/sage   **'       >>   /etc/portage/package.accept_keywords/zzz \
     && echo 'dev-perl/MongoDB'                >>   /etc/portage/package.unmask/zzz \
+    && echo '<dev-python/docutils-0.18.1'     >>   /etc/portage/package.mask/zzz \
     && echo 'dev-python/nose'                 >>   /etc/portage/package.mask/zzz \
     && echo '<dev-lang/python-3.9.0'          >>   /etc/portage/package.mask/zzz \
     && echo 'dev-lang/python:3.10'            >>   /etc/portage/package.mask/zzz \
@@ -89,6 +93,11 @@ RUN    emerge media-gfx/tachyon dev-perl/MongoDB sci-mathematics/4ti2
 
 RUN    emerge sys-devel/clang dev-tex/hevea
 
+COPY   tomlkit-0.9.0.ebuild /var/db/repos/gentoo/dev-python/tomlkit/tomlkit-0.9.0.ebuild
+RUN    ebuild /var/db/repos/gentoo/dev-python/tomlkit/tomlkit-0.9.0.ebuild digest
+
+RUN    emerge tomlkit poetry-core
+
 RUN    emerge sci-mathematics/sage_setup
 
 RUN    emerge giac
@@ -96,18 +105,19 @@ RUN    emerge giac
 RUN    emerge -o =sci-mathematics/sage-9999
 
 # `tox -e docker-gentoo-standard`
-RUN    emerge libcroco guile bc pari openblas desktop-file-utils flint \
-       eclib arb gp2c isl coinor-cbc libsemigroups yasm XML-Writer brial \
+RUN    emerge libcroco guile bc pari openblas desktop-file-utils    \
+       eclib arb gp2c isl coinor-cbc libsemigroups yasm XML-Writer  \
        XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG \
-       dev-perl/MongoDB dev-python/tox dev-libs/igraph lrcalc cliquer \
-       jedi parso sci-libs/symengine lrslib lcalc planarity singular \
-       pytest-cov docutils primecount primesieve media-gfx/graphviz \
-       ffmpeg pdf2svg
+       dev-perl/MongoDB dev-python/tox dev-libs/igraph brial flint  \
+       parso sci-libs/symengine lrslib planarity singular docutils  \
+       pytest-cov cliquer primecount primesieve media-gfx/graphviz  \
+       ffmpeg pdf2svg sci-mathematics/lrcalc sci-mathematics/lrcalc \
+       dev-python/jedi
 
 
 # cheating
 ARG PANDOC="https://github.com/jgm/pandoc"
-ARG VER="2.16.2"
+ARG VER="2.17.1.1"
 RUN    wget ${PANDOC}/releases/download/${VER}/pandoc-${VER}-linux-amd64.tar.gz \
     && tar xvzf pandoc-${VER}-linux-amd64.tar.gz -C /tmp \
        pandoc-${VER}/bin/pandoc \
@@ -143,14 +153,14 @@ CMD ["/bin/bash"]
 # docker buildx build --allow security.insecure                \
 #                     --progress=plain                         \
 #                     --platform=amd64                         \
-# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:22.01-py39,dest=22.01-py39.tar" \
+# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:22.02-py39,dest=22.02-py39.tar" \
 #                     -f Dockerfile .
 
 
-# docker load --input 22.01-py39.tar
+# docker load --input 22.02-py39.tar
 
 
 # not working:
-#  -t sheerluck/sage-on-gentoo-stage4:22.01-py39
+#  -t sheerluck/sage-on-gentoo-stage4:22.02-py39
 #  -t sheerluck/sage-on-gentoo-stage4:latest-py39
 #  -t sheerluck/sage-on-gentoo-stage4:latest
