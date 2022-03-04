@@ -1,5 +1,5 @@
-FROM gentoo/portage:20220209 as portage
-FROM gentoo/stage3:20220209
+FROM gentoo/portage:20220301 as portage
+FROM gentoo/stage3:20220301
 # copy the entire portage volume in
 COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
 
@@ -15,6 +15,7 @@ RUN    mkdir /etc/portage/profile \
 # patches
 RUN    mkdir -p /etc/portage/patches/dev-libs/ntl
 COPY   ntl-pc.patch /etc/portage/patches/dev-libs/ntl
+
 COPY   ipython_genutils-0.3.0.ebuild /var/db/repos/gentoo/dev-python/ipython_genutils/ipython_genutils-0.3.0.ebuild
 RUN    ebuild /var/db/repos/gentoo/dev-python/ipython_genutils/ipython_genutils-0.3.0.ebuild digest
 COPY   tachyon-0.99_beta6-r3.ebuild /var/db/repos/gentoo/media-gfx/tachyon/tachyon-0.99_beta6-r3.ebuild
@@ -23,8 +24,6 @@ COPY   pdf2svg-0.2.3-r4.ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.
 RUN    ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.2.3-r4.ebuild digest
 COPY   sphinx-4.4.0.ebuild /var/db/repos/gentoo/dev-python/sphinx/sphinx-4.4.0.ebuild
 RUN    ebuild /var/db/repos/gentoo/dev-python/sphinx/sphinx-4.4.0.ebuild digest
-COPY   setuptools-60.8.0.ebuild /var/db/repos/gentoo/dev-python/setuptools/setuptools-60.8.0.ebuild
-RUN    ebuild /var/db/repos/gentoo/dev-python/setuptools/setuptools-60.8.0.ebuild digest
 
 # layman
 RUN    echo 'PYTHON_TARGETS="python3_9"'        >> /etc/portage/make.conf \
@@ -79,7 +78,6 @@ RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/s
     && echo 'dev-perl/MongoDB'                >>   /etc/portage/package.unmask/zzz \
     && echo '<dev-python/docutils-0.18.1'     >>   /etc/portage/package.mask/zzz \
     && echo 'dev-python/nose'                 >>   /etc/portage/package.mask/zzz \
-    && echo 'dev-python/importlib_metadata'   >>   /etc/portage/package.mask/zzz \
     && echo '<dev-lang/python-3.9.0'          >>   /etc/portage/package.mask/zzz \
     && echo 'dev-lang/python:3.10'            >>   /etc/portage/package.mask/zzz \
     && echo 'dev-lang/python:3.11'            >>   /etc/portage/package.mask/zzz
@@ -118,12 +116,9 @@ RUN    emerge -o =sci-mathematics/sage-9.5
 RUN    emerge libcroco guile bc pari openblas desktop-file-utils    \
        eclib arb gp2c isl coinor-cbc libsemigroups yasm XML-Writer  \
        XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG \
-       dev-perl/MongoDB dev-python/tox dev-libs/igraph brial flint  \
-       parso sci-libs/symengine lrslib planarity singular docutils  \
-       pytest-cov cliquer primecount primesieve media-gfx/graphviz  \
-       ffmpeg pdf2svg sci-mathematics/lrcalc sci-mathematics/lrcalc \
-       dev-python/jedi
-
+       dev-python/tox dev-libs/igraph brial docutils ffmpeg pdf2svg \
+       parso sci-libs/symengine lrslib planarity dev-python/jedi    \
+       pytest-cov cliquer primecount primesieve media-gfx/graphviz
 
 # cheating
 ARG PANDOC="https://github.com/jgm/pandoc"
@@ -163,14 +158,14 @@ CMD ["/bin/bash"]
 # docker buildx build --allow security.insecure                \
 #                     --progress=plain                         \
 #                     --platform=amd64                         \
-# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:22.02-py39,dest=22.02-py39.tar" \
+# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:22.03-py39,dest=22.03-py39.tar" \
 #                     -f Dockerfile .
 
 
-# docker load --input 22.02-py39.tar
+# docker load --input 22.03-py39.tar
 
 
 # not working:
-#  -t sheerluck/sage-on-gentoo-stage4:22.02-py39
+#  -t sheerluck/sage-on-gentoo-stage4:22.03-py39
 #  -t sheerluck/sage-on-gentoo-stage4:latest-py39
 #  -t sheerluck/sage-on-gentoo-stage4:latest
