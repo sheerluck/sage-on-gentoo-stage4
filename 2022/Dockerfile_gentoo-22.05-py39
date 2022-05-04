@@ -1,0 +1,173 @@
+FROM gentoo/portage:20220502 as portage
+FROM gentoo/stage3:20220502
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/db/repos/sage-on-gentoo"
+
+ENV LANG=C.UTF-8
+
+# mkdir
+RUN    mkdir /etc/portage/profile \
+    && mkdir /etc/portage/package.unmask
+
+# patches
+RUN    mkdir -p /etc/portage/patches/dev-libs/ntl
+COPY   ntl-pc.patch /etc/portage/patches/dev-libs/ntl
+
+RUN    mkdir -p /etc/portage/patches/dev-python/cvxopt
+COPY   versioneer.py.patch /etc/portage/patches/dev-python/cvxopt
+
+COPY   ipython_genutils-0.3.0.ebuild /var/db/repos/gentoo/dev-python/ipython_genutils/ipython_genutils-0.3.0.ebuild
+RUN    ebuild /var/db/repos/gentoo/dev-python/ipython_genutils/ipython_genutils-0.3.0.ebuild digest
+COPY   tachyon-0.99_beta6-r3.ebuild /var/db/repos/gentoo/media-gfx/tachyon/tachyon-0.99_beta6-r3.ebuild
+RUN    ebuild /var/db/repos/gentoo/media-gfx/tachyon/tachyon-0.99_beta6-r3.ebuild digest
+COPY   pdf2svg-0.2.3-r4.ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.2.3-r4.ebuild
+RUN    ebuild /var/db/repos/gentoo/media-gfx/pdf2svg/pdf2svg-0.2.3-r4.ebuild digest
+
+COPY   0.9.7...master.patch /var/db/repos/gentoo/dev-libs/igraph/files/
+COPY   igraph-0.9.7.ebuild  /var/db/repos/gentoo/dev-libs/igraph/igraph-0.9.7.ebuild
+RUN    ebuild /var/db/repos/gentoo/dev-libs/igraph/igraph-0.9.7.ebuild digest
+
+# layman
+RUN    echo 'PYTHON_TARGETS="python3_9"'        >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_9"'  >> /etc/portage/make.conf \
+    && echo 'RUBY_TARGETS="ruby27"'             >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection png"'   >> /etc/portage/make.conf
+
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world
+
+RUN    echo 'app-eselect/eselect-repository ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && emerge app-eselect/eselect-repository dev-vcs/git \
+    && touch /etc/portage/repos.conf \
+    && eselect repository enable sage-on-gentoo \
+    && emaint sync --repo sage-on-gentoo
+
+# USE + ~amd64
+RUN    ln -s ${OVERLAY}/package.unmask/sage        /etc/portage/package.unmask/sage \
+    && ln -s ${OVERLAY}/package.keywords/s*-devel  /etc/portage/package.accept_keywords/sage \
+    && ln -s ${OVERLAY}/package.keywords/*4.11.0   /etc/portage/package.accept_keywords/gap  \
+    && ln -s ${OVERLAY}/package.use/sage           /etc/portage/package.use/sage \
+    && ln -s ${OVERLAY}/package.use/99sage-bin-doc /etc/portage/package.use/99sage-bin-doc \
+    && echo 'dev-python/rpy' >>                    /etc/portage/package.unmask/zzz \
+    && echo 'app-text/pandoc-2.13'            >>   /etc/portage/profile/package.provided \
+    && echo 'www-misc/thebe-20160525'         >>   /etc/portage/profile/package.provided \
+    && echo 'sci-libs/coinor-cbc-2.10.5'      >>   /etc/portage/profile/package.provided \
+    && echo 'app-text/poppler       cairo'    >>   /etc/portage/package.use/zzz \
+    && echo 'dev-lang/python        sqlite'   >>   /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny     minimal'  >>   /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny-XS  minimal'  >>   /etc/portage/package.use/zzz \
+    && echo 'dev-python/pillow      jpeg'     >>   /etc/portage/package.use/zzz \
+    && echo 'media-libs/harfbuzz    icu'      >>   /etc/portage/package.use/zzz \
+    && echo 'media-gfx/imagemagick xml jpeg svg tiff'>>/etc/portage/package.use/zzz \
+    && echo 'virtual/imagemagick-tools jpeg svg tiff'>>/etc/portage/package.use/zzz \
+    && echo 'media-libs/gd truetype fontconfig'>>  /etc/portage/package.use/zzz \
+    && echo 'dev-lang/R            -png'      >>   /etc/portage/package.use/zzz \
+    && echo 'sci-mathematics/sage  -doc'      >>   /etc/portage/package.use/zzz \
+    && echo 'gnome-base/librsvg     -vala'    >>   /etc/portage/package.use/zzz \
+    && echo 'media-video/ffmpeg gmp svg opus vorbis vpx theora'>>/etc/portage/package.use/zzz \
+    && echo 'media-gfx/tachyon jpeg -openmp threads'>>/etc/portage/package.use/zzz \
+    && echo 'app-misc/rlwrap        ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/R             ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/tre           ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/glib          ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/icu           ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/icu-layoutex  ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/jsoncpp       ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*             ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/*           ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'media-gfx/threejs-sage-extension ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/arpack        ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/libhomfly     ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/*      ~amd64'   >>   /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/MongoDB'                >>   /etc/portage/package.unmask/zzz \
+    && echo '>dev-python/docutils-0.17.9'     >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-python/nose'                 >>   /etc/portage/package.mask/zzz \
+    && echo '<dev-lang/python-3.9.0'          >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.10'            >>   /etc/portage/package.mask/zzz \
+    && echo 'dev-lang/python:3.11'            >>   /etc/portage/package.mask/zzz
+
+# ModuleNotFoundError: No module named 'sqlite3'
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
+    && emerge -C dev-lang/python:3.10
+
+
+RUN    emerge dev-tex/latexmk app-text/texlive texlive-mathscience  \
+       texlive-langcjk texlive-langcyrillic texlive-langenglish     \
+       texlive-langeuropean texlive-langfrench texlive-langgerman   \
+       texlive-langitalian texlive-langjapanese texlive-latexextra  \
+       texlive-langportuguese texlive-langspanish app-text/dvipng   \
+       texlive-latexrecommended
+
+RUN    emerge rust-bin
+
+RUN    emerge media-gfx/tachyon dev-perl/MongoDB sci-mathematics/4ti2
+
+RUN    emerge sys-devel/clang dev-tex/hevea
+
+RUN    emerge =sci-mathematics/sage_setup-9.5
+
+COPY   sage-9.5.ebuild ${OVERLAY}/sci-mathematics/sage/sage-9.5.ebuild
+RUN    ebuild ${OVERLAY}/sci-mathematics/sage/sage-9.5.ebuild digest
+
+RUN    emerge -o =sci-mathematics/sage-9.5
+
+# `tox -e docker-gentoo-standard`
+RUN    emerge libcroco guile bc pari openblas desktop-file-utils    \
+       eclib arb gp2c isl coinor-cbc libsemigroups yasm XML-Writer  \
+       XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG \
+       dev-python/tox dev-libs/igraph brial docutils ffmpeg pdf2svg \
+       parso sci-libs/symengine lrslib planarity dev-python/jedi    \
+       pytest-cov cliquer primecount primesieve media-gfx/graphviz
+
+# cheating
+ARG PANDOC="https://github.com/jgm/pandoc"
+ARG VER="2.18"
+RUN    wget ${PANDOC}/releases/download/${VER}/pandoc-${VER}-linux-amd64.tar.gz \
+    && tar xvzf pandoc-${VER}-linux-amd64.tar.gz -C /tmp \
+       pandoc-${VER}/bin/pandoc \
+    && mv /tmp/pandoc-${VER}/bin/* /usr/bin/ \
+    && rm -frv pandoc-${VER}-linux-amd64.tar.gz \
+    && rm -frv /tmp/pandoc-${VER}
+
+
+# cleanup
+RUN    emerge -C sci-mathematics/sage_setup
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world
+RUN    emerge @preserved-rebuild       \
+    && eselect news read               \
+    && rm -frv /var/cache/distfiles/*  \
+    && rm -frv /usr/share/gap/doc/*    \
+    && rm -frv /opt/*                  \
+    && mv /usr/share/doc/pari-* /tmp   \
+    && rm -frv /usr/share/doc/*        \
+    && mv /tmp/pari-* /usr/share/doc   \
+    && rm -frv /usr/share/man/*
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker buildx rm insecure-builder
+
+# docker buildx create --config /etc/buildkit/buildkitd.toml              \
+#      --use --name insecure-builder                                      \
+#      --buildkitd-flags '--allow-insecure-entitlement security.insecure' \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1                     \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+# docker buildx build --allow security.insecure                \
+#                     --progress=plain                         \
+#                     --platform=amd64                         \
+# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:22.05-py39,dest=22.05-py39.tar" \
+#                     -f Dockerfile .
+
+
+# docker load --input 22.05-py39.tar
+
+
+# not working:
+#  -t sheerluck/sage-on-gentoo-stage4:22.05-py39
+#  -t sheerluck/sage-on-gentoo-stage4:latest-py39
+#  -t sheerluck/sage-on-gentoo-stage4:latest
