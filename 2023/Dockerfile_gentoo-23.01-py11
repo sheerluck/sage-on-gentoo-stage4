@@ -1,0 +1,91 @@
+FROM sheerluck/sage-on-gentoo-stage4:23.01-py10
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/db/repos/sage-on-gentoo"
+ARG GENTOO="/var/db/repos/gentoo"
+
+ENV LANG=C.UTF-8
+
+# patches
+
+RUN    mkdir -p /usr/lib/python3.11/site-packages/notebook/static/style/
+COPY   style.min.css /usr/lib/python3.11/site-packages/notebook/static/style/style.min.css
+
+# 3.11 part
+COPY   zziplib-0.13.72-r11.ebuild          ${GENTOO}/dev-libs/zziplib/
+RUN    ebuild ${GENTOO}/dev-libs/zziplib/zz*-0.13.72-r11.ebuild           digest
+COPY   rpy-3.5.5-r11.ebuild                ${GENTOO}/dev-python/rpy/
+RUN    ebuild ${GENTOO}/dev-python/rpy/rpy-3.5.5-r11.ebuild               digest
+COPY   sympy-1.11.1-r11.ebuild             ${GENTOO}/dev-python/sympy/
+RUN    ebuild ${GENTOO}/dev-python/sympy/sympy-1.11.1-r11.ebuild          digest
+COPY   tre-0.8.0_p20210321-r11.ebuild      ${GENTOO}/dev-libs/tre/
+RUN    ebuild ${GENTOO}/dev-libs/tre/tre-0.8.0_p20210321-r11.ebuild       digest
+COPY   pytest-cov-4.0.0-r11.ebuild         ${GENTOO}/dev-python/pytest-cov/
+RUN    ebuild ${GENTOO}/dev-python/pytest-cov/pytest-cov-4.0.0-r11.ebuild digest
+
+
+RUN    rm /etc/portage/make.conf
+
+RUN    echo 'PYTHON_TARGETS="python3_11"'       >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_11"' >> /etc/portage/make.conf \
+    && echo 'RUBY_TARGETS="ruby27"'             >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'L10N="en"'                         >> /etc/portage/make.conf \
+    && echo 'ACCEPT_LICENSE="CeCILL-B"'         >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection png"'   >> /etc/portage/make.conf \
+    && echo '-python_targets_python3_11'        >> /etc/portage/profile/use.stable.mask \
+    && echo '-python_single_target_python3_11'  >> /etc/portage/profile/use.stable.mask
+
+RUN    rm /etc/portage/package.mask/python
+
+RUN    echo '<dev-lang/python-3.11.0'                   >> /etc/portage/package.mask/python \
+    && echo 'dev-lang/python:3.12'                      >> /etc/portage/package.mask/python
+
+RUN    emerge rust-bin
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
+    && emerge -C dev-lang/python:3.10
+
+RUN    emerge beniget bottleneck cvxopt cypari2 cysignals fpylll future   \
+       gast gentoolkit gmpy jupyter_jsmol lark memory_allocator           \
+       meson-python mpmath networkx numexpr pandas pkgconfig poetry-core  \
+       primecountpy pyproject-metadata pythran pytz_deprecation_shim rpy  \
+       ExportSageNB scipy snowballstemmer dev-python/sphinx sympy tre     \
+       tzlocal pplpy dev-python/lrcalc
+
+
+# cleanup
+RUN    emerge @preserved-rebuild       \
+    && eselect news read               \
+    && rm -frv /var/cache/distfiles/*  \
+    && rm -frv /usr/share/gap/doc/*    \
+    && rm -frv /opt/*                  \
+    && mv /usr/share/doc/pari-* /tmp   \
+    && rm -frv /usr/share/doc/*        \
+    && mv /tmp/pari-* /usr/share/doc   \
+    && rm -frv /usr/share/man/*
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker buildx rm insecure-builder
+
+# docker buildx create --config /etc/buildkit/buildkitd.toml              \
+#      --use --name insecure-builder                                      \
+#      --buildkitd-flags '--allow-insecure-entitlement security.insecure' \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1                     \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+# docker buildx build --allow security.insecure                \
+#                     --progress=plain                         \
+#                     --platform=amd64                         \
+# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:23.01-py11,dest=23.01-py11.tar" \
+#                     -f Dockerfile .
+
+
+# docker load --input 23.01-py11.tar
+
+
+# not working:
+#  -t sheerluck/sage-on-gentoo-stage4:23.01-py11
+#  -t sheerluck/sage-on-gentoo-stage4:latest-py11
+#  -f Dockerfile .
