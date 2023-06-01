@@ -1,0 +1,200 @@
+FROM gentoo/portage:20230529 as portage
+FROM gentoo/stage3:20230529
+# copy the entire portage volume in
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+ARG FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+ARG OVERLAY="/var/db/repos/sage-on-gentoo"
+ARG GENTOO="/var/db/repos/gentoo"
+
+ENV LANG=C.UTF-8
+
+# mkdir
+RUN    mkdir /etc/portage/package.unmask
+
+# patches
+RUN    mkdir -p /etc/portage/patches/dev-libs/ntl
+COPY   ntl-pc.patch /etc/portage/patches/dev-libs/ntl
+
+COPY   4ti2-1.6.10.tar.gz        /var/cache/distfiles/4ti2-1.6.10.tar.gz
+COPY   4ti2-1.6.10.ebuild        ${GENTOO}/sci-mathematics/4ti2/
+RUN    ebuild ${GENTOO}/sci-mathematics/4ti2/4ti2-1.6.10.ebuild     digest
+COPY   openblas-0.3.12-shared-blas-lapack.patch ${GENTOO}/sci-libs/openblas/files/
+COPY   openblas-0.3.23.ebuild    ${GENTOO}/sci-libs/openblas/
+RUN    ebuild ${GENTOO}/sci-libs/openblas/openblas-0.3.23.ebuild    digest
+COPY   singular-4.3.2_p1.ebuild  ${GENTOO}/sci-mathematics/singular/
+RUN    ebuild ${GENTOO}/sci-mathematics/singular/si*3.2_p1.ebuild   digest
+RUN    mkdir -p /var/db/repos/gentoo/sci-mathematics/coxeter/files
+COPY   coxeter-makefile.patch coxeter-sage.patch ${GENTOO}/sci-mathematics/coxeter/files
+COPY   coxeter-9999.ebuild       ${GENTOO}/sci-mathematics/coxeter/
+RUN    ebuild ${GENTOO}/sci-mathematics/coxeter/c*-9999.ebuild      digest
+COPY   tachyon-0.99_beta6-r3.ebuild ${GENTOO}/media-gfx/tachyon/
+RUN    ebuild ${GENTOO}/media-gfx/tachyon/t*3.ebuild                digest
+COPY   pdf2svg-0.2.3-r4.ebuild   ${GENTOO}/media-gfx/pdf2svg/
+RUN    ebuild ${GENTOO}/media-gfx/pdf2svg/p*r4.ebuild               digest
+COPY   giac-1.9.0.29-r1.ebuild   ${GENTOO}/sci-mathematics/giac/
+RUN    ebuild ${GENTOO}/sci-mathematics/giac/g*29-r1.ebuild         digest
+COPY   palp-2.20.tar.gz   /var/cache/distfiles/palp-2.20.tar.gz
+
+
+# layman
+RUN    echo 'PYTHON_TARGETS="python3_10"'       >> /etc/portage/make.conf \
+    && echo 'PYTHON_SINGLE_TARGET="python3_10"' >> /etc/portage/make.conf \
+    && echo 'RUBY_TARGETS="ruby30"'             >> /etc/portage/make.conf \
+    && echo 'FEATURES="'${FEATURES}'"'          >> /etc/portage/make.conf \
+    && echo 'L10N="en"'                         >> /etc/portage/make.conf \
+    && echo 'ACCEPT_LICENSE="CeCILL-B"'         >> /etc/portage/make.conf \
+    && echo 'USE="${USE} -introspection png"'   >> /etc/portage/make.conf
+
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world
+
+RUN    echo 'app-eselect/eselect-repository ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && emerge app-eselect/eselect-repository dev-vcs/git \
+    && touch /etc/portage/repos.conf \
+    && eselect repository enable sage-on-gentoo \
+    && emaint sync --repo sage-on-gentoo
+
+# USE + ~amd64
+RUN    ln -s ${OVERLAY}/package.keywords/*99  /etc/portage/package.accept_keywords/sage \
+    && ln -s ${OVERLAY}/package.keywords/*11* /etc/portage/package.accept_keywords/11   \
+    && ln -s ${OVERLAY}/package.keywords/*12* /etc/portage/package.accept_keywords/12   \
+    && ln -s ${OVERLAY}/package.use/sage      /etc/portage/package.use/sage             \
+    && ln -s ${OVERLAY}/package.use/*doc      /etc/portage/package.use/doc              \
+    && echo 'app-text/pandoc-2.13'            >>  /etc/portage/profile/package.provided \
+    && echo 'www-misc/thebe-20160525'         >>  /etc/portage/profile/package.provided \
+    && echo 'sci-libs/coinor-cbc-2.10.5'      >>  /etc/portage/profile/package.provided \
+    && echo 'sci-mathematics/pari-data-20191216' >> /etc/portage/profile/package.provided \
+    && echo 'app-text/poppler          cairo          ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-lang/R                -png           ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-lang/python           sqlite         ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny        minimal        ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-perl/Type-Tiny-XS     minimal        ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-python/pillow         jpeg webp      ' >> /etc/portage/package.use/zzz \
+    && echo 'dev-python/pyzmq          drafts         ' >> /etc/portage/package.use/zzz \
+    && echo 'gnome-base/librsvg        -vala          ' >> /etc/portage/package.use/zzz \
+    && echo 'media-gfx/imagemagick   xml jpeg svg tiff' >> /etc/portage/package.use/zzz \
+    && echo 'media-gfx/tachyon jpeg    -openmp threads' >> /etc/portage/package.use/zzz \
+    && echo 'media-libs/gd         truetype fontconfig' >> /etc/portage/package.use/zzz \
+    && echo 'media-libs/harfbuzz       icu            ' >> /etc/portage/package.use/zzz \
+    && echo 'media-video/ffmpeg        svg opus vorbis' >> /etc/portage/package.use/zzz \
+    && echo 'media-video/ffmpeg        vpx theora gmp ' >> /etc/portage/package.use/zzz \
+    && echo 'net-libs/zeromq           drafts         ' >> /etc/portage/package.use/zzz \
+    && echo 'sci-mathematics/pari      -data          ' >> /etc/portage/package.use/zzz \
+    && echo 'sci-mathematics/sage      -doc           ' >> /etc/portage/package.use/zzz \
+    && echo 'virtual/imagemagick-tools jpeg svg tiff  ' >> /etc/portage/package.use/zzz \
+    && echo 'app-misc/rlwrap                    ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'app-portage/gentoolkit             ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'app-text/pandoc-bin                ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/R                         ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-lang/go                        ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/glib                      ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/icu                       ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/icu-layoutex              ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/igraph                    ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/jsoncpp                   ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-libs/tre                       ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-perl/*                         ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-python/*                       ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-util/github-cli                ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'dev-util/meson                     ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'media-gfx/threejs-sage-extension   ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-libs/*                         ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sci-mathematics/*                  ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sys-libs/timezone-data             ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sys-devel/gdb                      ~amd64' >> /etc/portage/package.accept_keywords/zzz \
+    && echo 'sys-devel/clang                    ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/llvm                     ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/clang-common             ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/clang-toolchain-symlinks ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/llvm-toolchain-symlinks  ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-libs/compiler-rt-sanitizers    ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/clang-runtime            ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-libs/compiler-rt               ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-libs/libomp                    ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/llvmgold                 ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'sys-devel/gcc-config               ~amd64' >> /etc/portage/package.accept_keywords/clang \
+    && echo 'dev-perl/MongoDB'                          >> /etc/portage/package.unmask/zzz  \
+    && echo 'dev-python/rpy'                            >> /etc/portage/package.unmask/zzz  \
+    && echo 'dev-python/nose'                           >> /etc/portage/package.mask/zzz    \
+    && echo 'dev-lang/rust'                             >> /etc/portage/package.mask/zzz    \
+    && echo '<dev-lang/python-3.10.0'                   >> /etc/portage/package.mask/python \
+    && echo 'dev-lang/python:3.11'                      >> /etc/portage/package.mask/python \
+    && echo 'dev-lang/python:3.12'                      >> /etc/portage/package.mask/python
+
+
+
+
+# ModuleNotFoundError: No module named 'sqlite3'
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world  \
+    && emerge -C dev-lang/python:3.11
+
+RUN    emerge app-crypt/gnupg net-misc/openssh kissat \
+       sci-mathematics/normaliz sci-mathematics/coxeter
+
+RUN    emerge dev-lang/go pandoc-bin
+
+RUN    emerge rust-bin ipython giac github-cli
+
+RUN    emerge media-gfx/tachyon dev-perl/MongoDB sci-mathematics/4ti2
+
+RUN    emerge dev-tex/latexmk app-text/texlive texlive-mathscience  \
+       texlive-langcjk texlive-langcyrillic texlive-langenglish     \
+       texlive-langeuropean texlive-langfrench texlive-langgerman   \
+       texlive-langitalian texlive-langjapanese app-text/dvipng     \
+       texlive-langportuguese texlive-langspanish
+
+RUN    emerge gcc-config sys-devel/clang dev-tex/hevea
+
+RUN    emerge sci-mathematics/sage_setup
+
+COPY   sage-10.0-r11.ebuild ${OVERLAY}/sci-mathematics/sage/sage-10.0-r11.ebuild
+RUN    ebuild ${OVERLAY}/sci-mathematics/sage/sage-10.0-r11.ebuild digest
+
+RUN    emerge -o =sci-mathematics/sage-10.0-r11
+
+
+# `tox -e docker-gentoo-standard`
+RUN    emerge sys-devel/bc dev-python/tox openblas sci-libs/symengine \
+       gp2c isl libsemigroups yasm XML-Writer lrslib pytest-cov guile \
+       XML-LibXML XML-LibXSLT File-Slurp Term-ReadLine-Gnu JSON SVG   \
+       libcroco dev-libs/igraph ffmpeg pdf2svg media-gfx/graphviz tbb
+
+
+# cleanup
+RUN    emerge -C sci-mathematics/sage_setup sci-mathematics/sage-conf go-bootstrap
+RUN    emerge -DNu --with-bdeps=y --complete-graph=y @system @world
+RUN    emerge @preserved-rebuild       \
+    && eselect news read               \
+    && rm -frv /var/cache/distfiles/*  \
+    && rm -frv /usr/share/gap/doc/*    \
+    && rm -frv /opt/*                  \
+    && mv /usr/share/doc/pari-* /tmp   \
+    && rm -frv /usr/share/doc/*        \
+    && mv /tmp/pari-* /usr/share/doc   \
+    && rm -frv /usr/share/man/*
+
+WORKDIR /
+CMD ["/bin/bash"]
+
+# docker buildx rm insecure-builder
+
+# docker buildx create --config /etc/buildkit/buildkitd.toml              \
+#      --use --name insecure-builder                                      \
+#      --buildkitd-flags '--allow-insecure-entitlement security.insecure' \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=-1                     \
+#      --driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+# docker buildx build --allow security.insecure                \
+#                     --progress=plain                         \
+#                     --platform=amd64                         \
+# --output "type=docker,push=false,name=sheerluck/sage-on-gentoo-stage4:23.06-py10,dest=23.06-py10.tar" \
+#                     -f Dockerfile .
+
+
+# docker load --input 23.06-py10.tar
+
+
+# not working:
+#  -t sheerluck/sage-on-gentoo-stage4:23.06-py10
+#  -t sheerluck/sage-on-gentoo-stage4:latest-py10
+#  -f Dockerfile .
